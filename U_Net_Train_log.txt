@@ -1,0 +1,50 @@
+U_Net_GPT.py log
+
+Device: cuda                                   
+GPU: NVIDIA GeForce RTX 3060 Ti
+No checkpoint found. Start new training.
+
+Epoch 1/5
+Train Phase: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 531/531 [1:07:13<00:00,  7.60s/it, loss=0.3138]
+Train Loss: 0.3410
+Val Phase: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 133/133 [16:17<00:00,  7.35s/it, loss=0.3241]
+Val Loss: 0.4361
+Saved best model: models\model_best.pth
+Saved checkpoint: models\checkpoint.pth
+Saved latest model: models\model_latest.pth
+
+Epoch 2/5
+Train Phase: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 531/531 [1:07:34<00:00,  7.64s/it, loss=0.3004]
+Train Loss: 0.3184
+Val Phase: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 133/133 [17:00<00:00,  7.68s/it, loss=0.2431]
+Val Loss: 0.3024
+Saved best model: models\model_best.pth
+Saved checkpoint: models\checkpoint.pth
+Saved latest model: models\model_latest.pth
+
+Epoch 3/5
+Train Phase: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 531/531 [1:09:33<00:00,  7.86s/it, loss=0.3460]
+Train Loss: 0.3139
+Val Phase: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 133/133 [17:26<00:00,  7.87s/it, loss=0.2354]
+Val Loss: 0.2970
+Saved best model: models\model_best.pth
+Saved checkpoint: models\checkpoint.pth
+Saved latest model: models\model_latest.pth
+
+Epoch 4/5
+Train Phase: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 531/531 [1:07:15<00:00,  7.60s/it, loss=0.3091]
+Train Loss: 0.3108
+Val Phase: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 133/133 [16:21<00:00,  7.38s/it, loss=0.2123]
+Val Loss: 0.2989
+Saved checkpoint: models\checkpoint.pth
+Saved latest model: models\model_latest.pth
+
+Epoch 5/5
+Train Phase: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 531/531 [1:04:04<00:00,  7.24s/it, loss=0.2467]
+Train Loss: 0.3063
+Val Phase: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 133/133 [15:33<00:00,  7.02s/it, loss=0.2233]
+Val Loss: 0.3056
+Saved checkpoint: models\checkpoint.pth
+Saved latest model: models\model_latest.pth
+
+Training finished. Saved final model: models\model_final.pth
