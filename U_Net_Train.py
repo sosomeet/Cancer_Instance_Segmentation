@@ -32,25 +32,35 @@ from tqdm import tqdm
 # -----------------------------
 # Dataset
 # -----------------------------
+
+# Raw data to Model data formating.
 class NumpySegDataset(Dataset):
     def __init__(self, images_path, masks_path, transform=None, target_transform=None):
-        self.images = np.load(images_path, mmap_mode="r")
-        self.masks = np.load(masks_path, mmap_mode="r")
+        self.images = np.load(images_path, mmap_mode="r") # image data load
+        self.masks = np.load(masks_path, mmap_mode="r") # mask g-t data load
+
+        # Not use, but if you try to data augmentation or preprocessing, you can use this.
         self.transform = transform
         self.target_transform = target_transform
 
+    # Return the length of dataset.
+    # Data loader will use this to know how many batches to create.
     def __len__(self):
         return len(self.images)
 
+    # get item by index
     def __getitem__(self, idx):
         image = self.images[idx]
         mask = self.masks[idx]
 
+        # If you want to use data augmentation or preprocessing, you can use this.
         if self.transform:
             image = self.transform(image)
         if self.target_transform:
             mask = self.target_transform(mask)
 
+        # Numpy Image : (Height, Width, RGB Channel)
+        # PyTorch Image : (RGB Channel, Height, Width)
         # image: (H, W, C) -> (C, H, W)
         # mask : (H, W, C) -> (C, H, W)
         image = torch.tensor(image, dtype=torch.float32).permute(2, 0, 1)
@@ -66,66 +76,122 @@ class NumpySegDataset(Dataset):
 # -----------------------------
 # Model
 # -----------------------------
-class UNetConv2(nn.Module):
+
+# U-Net model convolution block
+# Structure : Conv -> Conv
+class UNetConv2(nn.Module): # Pytorch have to inherit nn.Module to make NN.
     def __init__(self, in_channels, out_channels):
+        # execute the constructor of the parent class nn.Module.
         super().__init__()
+
+        # First convolution block: Conv2d -> BatchNorm2d -> ReLU
+        # nn.Sequential() is a container that allows you to stack layers together.
         self.conv1 = nn.Sequential(
+            # Extract features from input image using convolutional layer.
+            # 3*3 kernel size, stride=1, padding=0
             nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=0),
+
+            # Normalize the output of the convolutional layer.
+            # Not include in the original U-Net paper, but it is a common practice to use batch normalization after convolutional layers.
             nn.BatchNorm2d(out_channels),
+
+            # Add non-linearity to the model.
             nn.ReLU(inplace=True),
         )
+
+        # Reprocess the output of the first convolution block.
         self.conv2 = nn.Sequential(
             nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=0),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
         )
 
+    # Forward pass of the convolution block.
+    # Excute the conv conv calculation and return the output feature map.
     def forward(self, x):
+        # x : feature map
+        # input tensor of shape (Batch, RGB Channel, Height, Width)
         x = self.conv1(x)
         x = self.conv2(x)
         return x
 
-
+# U-Net model
+# Full-connected encoder-decoder architecture with skip connections.
 class UNet(nn.Module):
+    # num_classes : number of output classes (6 for cancer instance segmentation)
+    # in_channel : number of input channels (3 for RGB images)
     def __init__(self, num_classes=6, in_channel=3):
         super().__init__()
+
+        # Encoder path, 4 downsampling steps.
+        # Each step has 2 convolutional layers followed by a max pooling layer.
         self.conv_1 = UNetConv2(in_channel, 64)
         self.conv_2 = UNetConv2(64, 128)
         self.conv_3 = UNetConv2(128, 256)
         self.conv_4 = UNetConv2(256, 512)
 
-        self.mid_conv = UNetConv2(512, 1024)
+        # bottleneck
+        self.mid_conv = UNetConv2(512, 1024) # conv conv
 
+        # Decoder path, 4 upsampling steps.
+        # Each step has a transposed convolutional layer followed by 2 convolutional layers.
         self.conv_5 = UNetConv2(1024, 512)
         self.conv_6 = UNetConv2(512, 256)
         self.conv_7 = UNetConv2(256, 128)
         self.conv_8 = UNetConv2(128, 64)
 
+        # Downsampling layer using max pooling to reduce spatial dimensions.
+        # Output channel will be the same as input channel, but height and width will be halved.
         self.down = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        # Upsampling layers using transposed convolution to increase spatial dimensions.
+        # Output channel will be halved, but height and width will be doubled.
         self.up_1 = nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2)
         self.up_2 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
         self.up_3 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
         self.up_4 = nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2)
 
+        # Final layer to map the output of the last convolutional block to the desired number of classes.
         self.end = nn.Conv2d(64, num_classes, kernel_size=1, stride=1)
 
+    # Sub function to assist skip connection.
+    # Beacuse the encoder use valid padding and use 3*3 kernel, it will reduce the spatial dimensions of the feature map.
+    # So, we need to crop the feature map from the encoder to match the spatial dimensions of the upsampled feature map from the decoder.
+    # Center-crop the feature map from the encoder to match the spatial dimensions of the upsampled feature map from the decoder.
     @staticmethod
+    # src : feature map from encoder
+    # target : feature map from decoder
     def center_crop_like(src, target):
         """Center-crop src to target spatial size."""
+        # Dismiss batch and channel dimensions, keep height and width.
         _, _, h, w = src.shape
+        # Dismiss batch and channel dimensions, keep target height and width.
         _, _, th, tw = target.shape
+
+        # Calculate the top-left corner of the crop region.
         top = max((h - th) // 2, 0)
         left = max((w - tw) // 2, 0)
+
+        # Drop the extra pixels from the top and left, and return the cropped feature map.
         return src[:, :, top : top + th, left : left + tw]
 
+    # Forward pass of the U-Net model.
+    # x : input image tensor of shape (Batch, RGB Channel, Height, Width)
     def forward(self, x):
-        padded_x = F.pad(x, (92, 92, 92, 92), mode="reflect")
+        padded_x = F.pad(x, (92, 92, 92, 92), mode="reflect") # Reflect padding is used to avoid introducing artificial edges in the input image.
 
+        # First convolution block
+        # Extract the most basic features from the input image.
+        # ex) edges, corners, textures, etc.
         conv_1 = self.conv_1(padded_x)
+        # If the height or width of the feature map is odd, pad it with one pixel to make it even.
         if conv_1.size(2) % 2 != 0:
             conv_1 = F.pad(conv_1, (0, 1, 0, 1))
+        # Max pooling to reduce the spatial dimensions of the feature map by half.
         pool1 = self.down(conv_1)
 
+        # Repeat the same process for the next encoder convolution blocks.
+        # Reduce the feature map size and increase the number of channels to capture more complex features.
         conv_2 = self.conv_2(pool1)
         if conv_2.size(2) % 2 != 0:
             conv_2 = F.pad(conv_2, (0, 1, 0, 1))
@@ -141,6 +207,9 @@ class UNet(nn.Module):
             conv_4 = F.pad(conv_4, (0, 1, 0, 1))
         pool4 = self.down(conv_4)
 
+        # The most deep layer of the U-Net.
+        # Bottleneck layer to capture the most abstract features of the input image.
+        # It reinforces the contextual information 
         mid_conv = self.mid_conv(pool4)
 
         up_1 = self.up_1(mid_conv)
