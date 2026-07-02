@@ -10,10 +10,10 @@ Changes from the notebook version:
 6. Saves batch weight samples to ./weights for debugging/inspection.
 
 Run:
-    python u_net_cancer_instance_segmentation_checkpoint.py
+    python U_Net_Train.py
 
 Optional:
-    python u_net_cancer_instance_segmentation_checkpoint.py --epochs 5 --batch_size 2
+    python U_Net_Train.py --epochs 5 --batch_size 2
 """
 
 from pathlib import Path
